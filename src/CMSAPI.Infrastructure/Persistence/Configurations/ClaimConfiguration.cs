@@ -8,32 +8,43 @@ public sealed class ClaimConfiguration : IEntityTypeConfiguration<Claim>
 {
     public void Configure(EntityTypeBuilder<Claim> builder)
     {
-        builder.ToTable("Claims");
-        builder.HasKey(x => x.Id);
+        builder.ToTable("Trn_Claim");
+        builder.HasKey(x => x.ClaimId);
+        builder.Property(x => x.ClaimId).ValueGeneratedOnAdd();
 
         builder.Property(x => x.ClaimNumber)
-            .HasMaxLength(30)
+            .HasMaxLength(50)
             .IsRequired();
 
         builder.HasIndex(x => x.ClaimNumber)
             .IsUnique();
 
-        builder.Property(x => x.PolicyNumber)
-            .HasMaxLength(40)
-            .IsRequired();
+        builder.Property(x => x.IncidentDescription)
+            .HasMaxLength(2000);
 
-        builder.Property(x => x.ClaimantName)
-            .HasMaxLength(120)
-            .IsRequired();
+        builder.Property(x => x.LocationOfLoss)
+            .HasMaxLength(500);
 
-        builder.Property(x => x.ClaimedAmount)
+        builder.Property(x => x.EstimatedLossAmount)
             .HasColumnType("decimal(18,2)");
 
-        builder.Property(x => x.ReservedAmount)
+        builder.Property(x => x.ApprovedLossAmount)
             .HasColumnType("decimal(18,2)");
 
-        builder.Property(x => x.Description)
-            .HasMaxLength(1000);
+        builder.Property(x => x.FraudScore)
+            .HasColumnType("decimal(5,2)");
+
+        builder.Property(x => x.CreatedBy)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.Property(x => x.ModifiedBy)
+            .HasMaxLength(100);
+
+        builder.HasIndex(x => x.PolicyId);
+        builder.HasIndex(x => x.ClaimTypeId);
+        builder.HasIndex(x => x.CurrentStatusId);
+        builder.HasIndex(x => x.ReportedDate);
+        builder.HasIndex(x => x.LossDate);
     }
 }
-

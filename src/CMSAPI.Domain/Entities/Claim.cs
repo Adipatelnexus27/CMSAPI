@@ -1,16 +1,24 @@
-using CMSAPI.Domain.Enums;
-
 namespace CMSAPI.Domain.Entities;
 
-public sealed class Claim : BaseEntity
+public sealed class Claim
 {
-    public required string ClaimNumber { get; set; }
-    public required string PolicyNumber { get; set; }
-    public required string ClaimantName { get; set; }
-    public DateTime IncidentDateUtc { get; set; }
-    public decimal ClaimedAmount { get; set; }
-    public decimal ReservedAmount { get; set; }
-    public ClaimStatus Status { get; set; } = ClaimStatus.Registered;
-    public string? Description { get; set; }
+    public long ClaimId { get; set; }
+    public string ClaimNumber { get; set; } = string.Empty;
+    public long PolicyId { get; set; }
+    public long ClaimTypeId { get; set; }
+    public long CurrentStatusId { get; set; }
+    public DateTime LossDate { get; set; }
+    public DateTime ReportedDate { get; set; }
+    public string? IncidentDescription { get; set; }
+    public string? LocationOfLoss { get; set; }
+    public decimal EstimatedLossAmount { get; set; }
+    public decimal? ApprovedLossAmount { get; set; }
+    public long CurrencyId { get; set; }
+    public decimal? FraudScore { get; set; }
+    public bool IsFraudSuspected { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public string CreatedBy { get; set; } = string.Empty;
+    public DateTime? ModifiedDate { get; set; }
+    public string? ModifiedBy { get; set; }
 }
-

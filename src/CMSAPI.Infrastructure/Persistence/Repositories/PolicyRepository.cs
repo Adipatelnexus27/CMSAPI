@@ -46,6 +46,20 @@ public sealed class PolicyRepository : IPolicyRepository
         await _dbContext.Policies.AddAsync(policy, cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<long, string>> GetPolicyNumbersByIdsAsync(IEnumerable<long> policyIds, CancellationToken cancellationToken = default)
+    {
+        var ids = policyIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<long, string>();
+        }
+
+        return await _dbContext.Policies
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.PolicyId))
+            .ToDictionaryAsync(x => x.PolicyId, x => x.PolicyNumber, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<PolicyCoverage>> GetCoveragesByPolicyIdAsync(long policyId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.PolicyCoverages
@@ -74,4 +88,3 @@ public sealed class PolicyRepository : IPolicyRepository
             .ToDictionaryAsync(x => x.CoverageTypeId, x => x.CoverageName, cancellationToken);
     }
 }
-

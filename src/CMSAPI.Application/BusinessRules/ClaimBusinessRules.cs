@@ -1,4 +1,5 @@
 using CMSAPI.Domain.Enums;
+using CMSAPI.Domain.Entities;
 using CMSAPI.Domain.Interfaces;
 
 namespace CMSAPI.Application.BusinessRules;
@@ -44,7 +45,7 @@ public sealed class ClaimBusinessRules
         }
     }
 
-    public async Task EnsurePolicyIsEligibleForClaimAsync(string policyNumber, DateTime incidentDateUtc, CancellationToken cancellationToken)
+    public async Task<Policy> EnsurePolicyIsEligibleForClaimAsync(string policyNumber, DateTime incidentDateUtc, CancellationToken cancellationToken)
     {
         var policy = await _policyRepository.GetByPolicyNumberAsync(policyNumber, cancellationToken);
         if (policy is null || !policy.IsActive)
@@ -62,5 +63,7 @@ public sealed class ClaimBusinessRules
         {
             throw new InvalidOperationException($"Incident date '{incidentDate:yyyy-MM-dd}' is outside policy coverage period.");
         }
+
+        return policy;
     }
 }
