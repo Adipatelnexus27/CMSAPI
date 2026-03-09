@@ -60,7 +60,7 @@ public sealed class ClaimService : IClaimService
             ClaimantName = claimantLookup.GetValueOrDefault(claim.ClaimId, "Unknown"),
             LossDateUtc = claim.LossDate,
             ReportedDateUtc = claim.ReportedDate,
-            StatusName = GetStatusName(claim.CurrentStatusId),
+            StatusName = ToDisplayStatusName(claim.CurrentStatusId),
             EstimatedLossAmount = claim.EstimatedLossAmount
         }).ToList();
     }
@@ -98,7 +98,7 @@ public sealed class ClaimService : IClaimService
             ClaimNumber = claimNumber,
             PolicyId = policy.PolicyId,
             ClaimTypeId = request.ClaimTypeId,
-            CurrentStatusId = (long)ClaimStatus.Registered,
+            CurrentStatusId = (long)ClaimStatus.New,
             LossDate = request.LossDateUtc,
             ReportedDate = DateTime.UtcNow,
             IncidentDescription = request.IncidentDescription?.Trim(),
@@ -139,6 +139,21 @@ public sealed class ClaimService : IClaimService
         return ToClaimDto(entity, policy.PolicyNumber, claimant, [], relatedClaims);
     }
 
+    public async Task<IReadOnlyList<ClaimWorkflowTransitionDto>> GetAllowedTransitionsAsync(long claimId, CancellationToken cancellationToken = default)
+    {
+        var claim = await _claimRepository.GetByIdAsync(claimId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Claim '{claimId}' was not found.");
+
+        var currentStatus = ToClaimStatus(claim.CurrentStatusId);
+        var transitions = _businessRules.GetAllowedTransitions(claim, currentStatus);
+
+        return transitions.Select(status => new ClaimWorkflowTransitionDto
+        {
+            Status = status,
+            StatusName = _businessRules.GetStatusDisplayName(status)
+        }).ToList();
+    }
+
     public async Task<ClaimDto> UpdateStatusAsync(
         long id,
         UpdateClaimStatusRequestDto request,
@@ -151,7 +166,7 @@ public sealed class ClaimService : IClaimService
             ?? throw new KeyNotFoundException($"Claim '{id}' was not found.");
 
         var currentStatus = ToClaimStatus(claim.CurrentStatusId);
-        _businessRules.EnsureStatusTransitionAllowed(currentStatus, request.Status);
+        _businessRules.EnsureStatusTransitionAllowed(claim, currentStatus, request.Status);
 
         claim.CurrentStatusId = (long)request.Status;
         claim.ModifiedDate = DateTime.UtcNow;
@@ -312,7 +327,7 @@ public sealed class ClaimService : IClaimService
         return long.TryParse(note.NoteText[prefix.Length..], out var parsed) ? parsed : null;
     }
 
-    private static ClaimDto ToClaimDto(
+    private ClaimDto ToClaimDto(
         Claim claim,
         string policyNumber,
         ClaimParty? claimant,
@@ -326,7 +341,7 @@ public sealed class ClaimService : IClaimService
             PolicyNumber = policyNumber,
             ClaimTypeId = claim.ClaimTypeId,
             CurrentStatusId = claim.CurrentStatusId,
-            StatusName = GetStatusName(claim.CurrentStatusId),
+            StatusName = ToDisplayStatusName(claim.CurrentStatusId),
             LossDateUtc = claim.LossDate,
             ReportedDateUtc = claim.ReportedDate,
             IncidentDescription = claim.IncidentDescription,
@@ -371,10 +386,14 @@ public sealed class ClaimService : IClaimService
         return (ClaimStatus)(int)statusId;
     }
 
-    private static string GetStatusName(long statusId)
+    private string ToDisplayStatusName(long statusId)
     {
-        return Enum.IsDefined(typeof(ClaimStatus), (int)statusId)
-            ? ((ClaimStatus)(int)statusId).ToString()
-            : $"Status-{statusId}";
+        if (!Enum.IsDefined(typeof(ClaimStatus), (int)statusId))
+        {
+            return $"Status-{statusId}";
+        }
+
+        var status = (ClaimStatus)(int)statusId;
+        return _businessRules.GetStatusDisplayName(status);
     }
 }

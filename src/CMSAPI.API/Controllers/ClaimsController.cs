@@ -43,6 +43,17 @@ public sealed class ClaimsController : ControllerBase
         return claim is null ? NotFound() : Ok(claim);
     }
 
+    [HttpGet("{id:long}/transitions")]
+    [Authorize(
+        Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.ClaimManager)},{nameof(UserRole.Adjuster)},{nameof(UserRole.Investigator)},{nameof(UserRole.FraudAnalyst)}",
+        Policy = PermissionPolicies.ClaimsRead)]
+    [ProducesResponseType(typeof(IReadOnlyList<ClaimWorkflowTransitionDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllowedTransitions(long id, CancellationToken cancellationToken)
+    {
+        var transitions = await _claimService.GetAllowedTransitionsAsync(id, cancellationToken);
+        return Ok(transitions);
+    }
+
     [HttpPost]
     [Authorize(
         Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.ClaimManager)},{nameof(UserRole.Adjuster)}",

@@ -6,27 +6,15 @@ namespace CMSAPI.Application.BusinessRules;
 
 public sealed class ClaimBusinessRules
 {
-    private static readonly Dictionary<ClaimStatus, ClaimStatus[]> AllowedTransitions = new()
-    {
-        [ClaimStatus.Registered] = [ClaimStatus.PolicyValidated, ClaimStatus.Closed],
-        [ClaimStatus.PolicyValidated] = [ClaimStatus.Assigned, ClaimStatus.Closed],
-        [ClaimStatus.Assigned] = [ClaimStatus.InvestigationInProgress, ClaimStatus.Closed],
-        [ClaimStatus.InvestigationInProgress] = [ClaimStatus.CoverageDetermined, ClaimStatus.Closed],
-        [ClaimStatus.CoverageDetermined] = [ClaimStatus.LiabilityDetermined, ClaimStatus.Closed],
-        [ClaimStatus.LiabilityDetermined] = [ClaimStatus.Reserved, ClaimStatus.Closed],
-        [ClaimStatus.Reserved] = [ClaimStatus.SettlementProcessed, ClaimStatus.Closed],
-        [ClaimStatus.SettlementProcessed] = [ClaimStatus.PaymentCompleted, ClaimStatus.Closed],
-        [ClaimStatus.PaymentCompleted] = [ClaimStatus.Closed],
-        [ClaimStatus.Closed] = []
-    };
-
     private readonly IClaimRepository _claimRepository;
     private readonly IPolicyRepository _policyRepository;
+    private readonly IClaimWorkflowEngine _workflowEngine;
 
-    public ClaimBusinessRules(IClaimRepository claimRepository, IPolicyRepository policyRepository)
+    public ClaimBusinessRules(IClaimRepository claimRepository, IPolicyRepository policyRepository, IClaimWorkflowEngine workflowEngine)
     {
         _claimRepository = claimRepository;
         _policyRepository = policyRepository;
+        _workflowEngine = workflowEngine;
     }
 
     public async Task EnsureClaimNumberIsUniqueAsync(string claimNumber, CancellationToken cancellationToken)
@@ -37,12 +25,19 @@ public sealed class ClaimBusinessRules
         }
     }
 
-    public void EnsureStatusTransitionAllowed(ClaimStatus currentStatus, ClaimStatus nextStatus)
+    public void EnsureStatusTransitionAllowed(Claim claim, ClaimStatus currentStatus, ClaimStatus nextStatus)
     {
-        if (!AllowedTransitions.TryGetValue(currentStatus, out var allowed) || !allowed.Contains(nextStatus))
-        {
-            throw new InvalidOperationException($"Invalid claim status transition: {currentStatus} -> {nextStatus}.");
-        }
+        _workflowEngine.ValidateTransition(claim, currentStatus, nextStatus);
+    }
+
+    public IReadOnlyList<ClaimStatus> GetAllowedTransitions(Claim claim, ClaimStatus currentStatus)
+    {
+        return _workflowEngine.GetAllowedTransitions(currentStatus, claim);
+    }
+
+    public string GetStatusDisplayName(ClaimStatus status)
+    {
+        return _workflowEngine.GetDisplayName(status);
     }
 
     public async Task<Policy> EnsurePolicyIsEligibleForClaimAsync(string policyNumber, DateTime incidentDateUtc, CancellationToken cancellationToken)

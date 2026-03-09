@@ -2,15 +2,15 @@ namespace CMSAPI.Domain.Enums;
 
 public enum ClaimStatus
 {
-    Registered = 1,
-    PolicyValidated = 2,
+    New = 1,
+    Triage = 2,
     Assigned = 3,
-    InvestigationInProgress = 4,
-    CoverageDetermined = 5,
-    LiabilityDetermined = 6,
-    Reserved = 7,
-    SettlementProcessed = 8,
-    PaymentCompleted = 9,
-    Closed = 10
+    Investigation = 4,
+    CoverageReview = 5,
+    LiabilityReview = 6,
+    ReserveCreated = 7,
+    FraudCheck = 8,
+    Settlement = 9,
+    Payment = 10,
+    Closed = 11
 }
-
