@@ -24,10 +24,14 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(EmailOptions.SectionName));
 
         services.AddScoped<IClaimRepository, ClaimRepository>();
+        services.AddScoped<IAuthRepository, AuthRepository>();
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IPasswordHasherService, PasswordHasherService>();
+        services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<AuthDataSeeder>();
 
         return services;
     }

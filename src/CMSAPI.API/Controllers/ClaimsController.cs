@@ -1,5 +1,6 @@
 using CMSAPI.Application.DTOs.Claims;
 using CMSAPI.Application.Interfaces.Services;
+using CMSAPI.Application.Security;
 using CMSAPI.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +20,9 @@ public sealed class ClaimsController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.Adjuster)},{nameof(UserRole.Supervisor)}")]
+    [Authorize(
+        Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.ClaimManager)},{nameof(UserRole.Adjuster)},{nameof(UserRole.Investigator)},{nameof(UserRole.FraudAnalyst)}",
+        Policy = PermissionPolicies.ClaimsRead)]
     [ProducesResponseType(typeof(IReadOnlyList<ClaimDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
@@ -28,7 +31,9 @@ public sealed class ClaimsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.Adjuster)},{nameof(UserRole.Supervisor)}")]
+    [Authorize(
+        Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.ClaimManager)},{nameof(UserRole.Adjuster)},{nameof(UserRole.Investigator)},{nameof(UserRole.FraudAnalyst)}",
+        Policy = PermissionPolicies.ClaimsRead)]
     [ProducesResponseType(typeof(ClaimDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
@@ -38,7 +43,9 @@ public sealed class ClaimsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.Adjuster)}")]
+    [Authorize(
+        Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.ClaimManager)},{nameof(UserRole.Adjuster)}",
+        Policy = PermissionPolicies.ClaimsCreate)]
     [ProducesResponseType(typeof(ClaimDto), StatusCodes.Status201Created)]
     public async Task<IActionResult> Create([FromBody] CreateClaimRequestDto request, CancellationToken cancellationToken)
     {
@@ -47,7 +54,9 @@ public sealed class ClaimsController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/status")]
-    [Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.Supervisor)}")]
+    [Authorize(
+        Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.ClaimManager)}",
+        Policy = PermissionPolicies.ClaimsAdjudicate)]
     [ProducesResponseType(typeof(ClaimDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateStatus(
         Guid id,
@@ -58,4 +67,3 @@ public sealed class ClaimsController : ControllerBase
         return Ok(updated);
     }
 }
-

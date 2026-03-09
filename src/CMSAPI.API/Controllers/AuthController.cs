@@ -1,12 +1,9 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
-using CMSAPI.API.Options;
 using CMSAPI.Application.DTOs.Auth;
+using CMSAPI.Application.Interfaces.Services;
 using CMSAPI.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 
 namespace CMSAPI.API.Controllers;
 
@@ -14,72 +11,68 @@ namespace CMSAPI.API.Controllers;
 [Route("api/[controller]")]
 public sealed class AuthController : ControllerBase
 {
-    private readonly JwtOptions _jwtOptions;
+    private readonly IAuthService _authService;
 
-    public AuthController(IOptions<JwtOptions> jwtOptions)
+    public AuthController(IAuthService authService)
     {
-        _jwtOptions = jwtOptions.Value;
+        _authService = authService;
+    }
+
+    [HttpPost("register")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [ProducesResponseType(typeof(AuthUserDto), StatusCodes.Status201Created)]
+    public async Task<IActionResult> Register([FromBody] RegisterRequestDto request, CancellationToken cancellationToken)
+    {
+        var user = await _authService.RegisterAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(Me), new { }, user);
     }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public IActionResult Login([FromBody] LoginRequestDto request)
+    public async Task<IActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
-        var userRole = ValidateUser(request);
-        if (userRole is null)
-        {
-            return Unauthorized("Invalid credentials.");
-        }
-
-        var expiresAt = DateTime.UtcNow.AddMinutes(_jwtOptions.AccessTokenExpiryMinutes);
-        var token = BuildToken(request.Username, userRole.Value, expiresAt);
-
-        return Ok(new LoginResponseDto
-        {
-            AccessToken = token,
-            ExpiresAtUtc = expiresAt
-        });
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var response = await _authService.LoginAsync(request, ipAddress, cancellationToken);
+        return Ok(response);
     }
 
-    private UserRole? ValidateUser(LoginRequestDto request)
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto request, CancellationToken cancellationToken)
     {
-        var users = new Dictionary<string, (string Password, UserRole Role)>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["admin"] = ("Admin@123", UserRole.Admin),
-            ["adjuster"] = ("Adjuster@123", UserRole.Adjuster),
-            ["supervisor"] = ("Supervisor@123", UserRole.Supervisor)
-        };
-
-        if (!users.TryGetValue(request.Username, out var user))
-        {
-            return null;
-        }
-
-        return user.Password == request.Password ? user.Role : null;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var response = await _authService.RefreshTokenAsync(request, ipAddress, cancellationToken);
+        return Ok(response);
     }
 
-    private string BuildToken(string username, UserRole role, DateTime expiresAtUtc)
+    [HttpPost("revoke")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> RevokeToken([FromBody] RevokeTokenRequestDto request, CancellationToken cancellationToken)
     {
-        var claims = new List<Claim>
+        var revokedBy = User.FindFirstValue(ClaimTypes.Name) ?? "system";
+        await _authService.RevokeRefreshTokenAsync(request, revokedBy, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public IActionResult Me()
+    {
+        var payload = new
         {
-            new(JwtRegisteredClaimNames.Sub, username),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new(ClaimTypes.Name, username),
-            new(ClaimTypes.Role, role.ToString())
+            UserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+            UserName = User.FindFirstValue(ClaimTypes.Name),
+            Email = User.FindFirstValue(ClaimTypes.Email),
+            Role = User.FindFirstValue(ClaimTypes.Role),
+            Permissions = User.FindAll("permission").Select(x => x.Value).Distinct().ToArray()
         };
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: _jwtOptions.Issuer,
-            audience: _jwtOptions.Audience,
-            claims: claims,
-            expires: expiresAtUtc,
-            signingCredentials: credentials);
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return Ok(payload);
     }
 }
 

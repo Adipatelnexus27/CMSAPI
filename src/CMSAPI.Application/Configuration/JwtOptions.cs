@@ -1,4 +1,4 @@
-namespace CMSAPI.API.Options;
+namespace CMSAPI.Application.Configuration;
 
 public sealed class JwtOptions
 {
@@ -7,5 +7,6 @@ public sealed class JwtOptions
     public string Audience { get; set; } = string.Empty;
     public string Key { get; set; } = string.Empty;
     public int AccessTokenExpiryMinutes { get; set; } = 60;
+    public int RefreshTokenExpiryDays { get; set; } = 7;
 }
 

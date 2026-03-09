@@ -37,6 +37,7 @@ public sealed class ExceptionHandlingMiddleware
             ValidationException => HttpStatusCode.BadRequest,
             KeyNotFoundException => HttpStatusCode.NotFound,
             InvalidOperationException => HttpStatusCode.BadRequest,
+            UnauthorizedAccessException => HttpStatusCode.Unauthorized,
             _ => HttpStatusCode.InternalServerError
         };
 
@@ -50,4 +51,3 @@ public sealed class ExceptionHandlingMiddleware
         await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
     }
 }
-
