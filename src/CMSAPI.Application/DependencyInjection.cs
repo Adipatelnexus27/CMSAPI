@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IClaimService, ClaimService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IPolicyService, PolicyService>();
+        services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
 
         return services;
     }
