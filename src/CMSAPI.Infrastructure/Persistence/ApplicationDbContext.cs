@@ -11,6 +11,7 @@ public sealed class ApplicationDbContext : DbContext, IUnitOfWork
     }
 
     public DbSet<Claim> Claims => Set<Claim>();
+    public DbSet<ClaimAssignment> ClaimAssignments => Set<ClaimAssignment>();
     public DbSet<ClaimParty> ClaimParties => Set<ClaimParty>();
     public DbSet<ClaimDocument> ClaimDocuments => Set<ClaimDocument>();
     public DbSet<ClaimNote> ClaimNotes => Set<ClaimNote>();

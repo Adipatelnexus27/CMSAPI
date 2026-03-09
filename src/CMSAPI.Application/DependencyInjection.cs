@@ -20,6 +20,7 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(JwtOptions.SectionName));
 
         services.AddScoped<ClaimBusinessRules>();
+        services.AddScoped<IClaimAssignmentService, ClaimAssignmentService>();
         services.AddSingleton<IClaimWorkflowEngine, ClaimWorkflowEngine>();
         services.AddScoped<IClaimService, ClaimService>();
         services.AddScoped<IAuthService, AuthService>();

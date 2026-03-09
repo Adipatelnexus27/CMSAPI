@@ -24,6 +24,7 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(EmailOptions.SectionName));
 
         services.AddScoped<IClaimRepository, ClaimRepository>();
+        services.AddScoped<IClaimAssignmentRepository, ClaimAssignmentRepository>();
         services.AddScoped<IAuthRepository, AuthRepository>();
         services.AddScoped<IPolicyRepository, PolicyRepository>();
         services.AddScoped<ISystemConfigurationRepository, SystemConfigurationRepository>();
