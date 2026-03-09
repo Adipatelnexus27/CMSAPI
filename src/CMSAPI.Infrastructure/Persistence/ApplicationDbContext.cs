@@ -11,6 +11,9 @@ public sealed class ApplicationDbContext : DbContext, IUnitOfWork
     }
 
     public DbSet<Claim> Claims => Set<Claim>();
+    public DbSet<Policy> Policies => Set<Policy>();
+    public DbSet<PolicyCoverage> PolicyCoverages => Set<PolicyCoverage>();
+    public DbSet<CoverageType> CoverageTypes => Set<CoverageType>();
     public DbSet<AuthUser> AuthUsers => Set<AuthUser>();
     public DbSet<AuthRole> AuthRoles => Set<AuthRole>();
     public DbSet<AuthPermission> AuthPermissions => Set<AuthPermission>();

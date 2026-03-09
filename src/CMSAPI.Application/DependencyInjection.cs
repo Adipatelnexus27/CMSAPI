@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<ClaimBusinessRules>();
         services.AddScoped<IClaimService, ClaimService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IPolicyService, PolicyService>();
 
         return services;
     }

@@ -48,6 +48,7 @@ public sealed class ClaimService : IClaimService
     public async Task<ClaimDto> CreateAsync(CreateClaimRequestDto request, CancellationToken cancellationToken = default)
     {
         await _createValidator.ValidateAndThrowAsync(request, cancellationToken);
+        await _businessRules.EnsurePolicyIsEligibleForClaimAsync(request.PolicyNumber.Trim(), request.IncidentDateUtc, cancellationToken);
 
         var claimNumber = $"CLM-{DateTime.UtcNow:yyyyMMdd}-{Random.Shared.Next(1000, 9999)}";
         await _businessRules.EnsureClaimNumberIsUniqueAsync(claimNumber, cancellationToken);
@@ -86,4 +87,3 @@ public sealed class ClaimService : IClaimService
         return _mapper.Map<ClaimDto>(claim);
     }
 }
-

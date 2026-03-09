@@ -20,10 +20,12 @@ public sealed class ClaimBusinessRules
     };
 
     private readonly IClaimRepository _claimRepository;
+    private readonly IPolicyRepository _policyRepository;
 
-    public ClaimBusinessRules(IClaimRepository claimRepository)
+    public ClaimBusinessRules(IClaimRepository claimRepository, IPolicyRepository policyRepository)
     {
         _claimRepository = claimRepository;
+        _policyRepository = policyRepository;
     }
 
     public async Task EnsureClaimNumberIsUniqueAsync(string claimNumber, CancellationToken cancellationToken)
@@ -41,5 +43,24 @@ public sealed class ClaimBusinessRules
             throw new InvalidOperationException($"Invalid claim status transition: {currentStatus} -> {nextStatus}.");
         }
     }
-}
 
+    public async Task EnsurePolicyIsEligibleForClaimAsync(string policyNumber, DateTime incidentDateUtc, CancellationToken cancellationToken)
+    {
+        var policy = await _policyRepository.GetByPolicyNumberAsync(policyNumber, cancellationToken);
+        if (policy is null || !policy.IsActive)
+        {
+            throw new InvalidOperationException($"Policy '{policyNumber}' does not exist or is inactive.");
+        }
+
+        if (!policy.PolicyStatus.Equals("Active", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Policy '{policyNumber}' is not active.");
+        }
+
+        var incidentDate = incidentDateUtc.Date;
+        if (incidentDate < policy.PolicyStartDate.Date || incidentDate > policy.PolicyEndDate.Date)
+        {
+            throw new InvalidOperationException($"Incident date '{incidentDate:yyyy-MM-dd}' is outside policy coverage period.");
+        }
+    }
+}
