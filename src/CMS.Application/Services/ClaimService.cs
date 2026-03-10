@@ -44,6 +44,22 @@ public sealed class ClaimService : IClaimService
         return await _claimRepository.GetClaimsAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ClaimSummaryDto>> GetAssignedClaimsAsync(Guid assigneeUserId, string role, CancellationToken cancellationToken)
+    {
+        if (assigneeUserId == Guid.Empty)
+        {
+            throw new InvalidOperationException("Assignee user id is required.");
+        }
+
+        if (!string.Equals(role, "Investigator", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(role, "Adjuster", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Role must be Investigator or Adjuster.");
+        }
+
+        return await _claimRepository.GetAssignedClaimsAsync(assigneeUserId, role, cancellationToken);
+    }
+
     public async Task<ClaimDetailDto> GetClaimDetailAsync(Guid claimId, CancellationToken cancellationToken)
     {
         var claim = await _claimRepository.GetClaimByIdAsync(claimId, cancellationToken)
@@ -51,9 +67,12 @@ public sealed class ClaimService : IClaimService
 
         var documents = await _claimRepository.GetClaimDocumentsAsync(claimId, cancellationToken);
         var related = await _claimRepository.GetRelatedClaimsAsync(claimId, cancellationToken);
+        var workflowHistory = await _claimRepository.GetWorkflowHistoryAsync(claimId, cancellationToken);
 
         claim.Documents = documents;
         claim.RelatedClaims = related;
+        claim.WorkflowHistory = workflowHistory;
+
         return claim;
     }
 
@@ -117,17 +136,54 @@ public sealed class ClaimService : IClaimService
             throw new InvalidOperationException("A claim cannot be linked to itself.");
         }
 
-        var claim = await _claimRepository.GetClaimByIdAsync(claimId, cancellationToken)
+        _ = await _claimRepository.GetClaimByIdAsync(claimId, cancellationToken)
             ?? throw new InvalidOperationException("Primary claim not found.");
 
-        _ = claim;
-
-        var relatedClaim = await _claimRepository.GetClaimByIdAsync(relatedClaimId, cancellationToken)
+        _ = await _claimRepository.GetClaimByIdAsync(relatedClaimId, cancellationToken)
             ?? throw new InvalidOperationException("Related claim not found.");
 
-        _ = relatedClaim;
-
         await _claimRepository.LinkRelatedClaimAsync(claimId, relatedClaimId, cancellationToken);
+    }
+
+    public async Task AssignInvestigatorAsync(Guid claimId, Guid investigatorUserId, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        if (investigatorUserId == Guid.Empty) throw new InvalidOperationException("Investigator user id is required.");
+        await EnsureClaimExists(claimId, cancellationToken);
+        await _claimRepository.AssignInvestigatorAsync(claimId, investigatorUserId, changedByUserId, cancellationToken);
+    }
+
+    public async Task AssignAdjusterAsync(Guid claimId, Guid adjusterUserId, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        if (adjusterUserId == Guid.Empty) throw new InvalidOperationException("Adjuster user id is required.");
+        await EnsureClaimExists(claimId, cancellationToken);
+        await _claimRepository.AssignAdjusterAsync(claimId, adjusterUserId, changedByUserId, cancellationToken);
+    }
+
+    public async Task SetPriorityAsync(Guid claimId, int priority, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        if (priority < 1 || priority > 5) throw new InvalidOperationException("Priority must be between 1 and 5.");
+        await EnsureClaimExists(claimId, cancellationToken);
+        await _claimRepository.SetPriorityAsync(claimId, priority, changedByUserId, cancellationToken);
+    }
+
+    public async Task UpdateStatusAsync(Guid claimId, string claimStatus, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(claimStatus)) throw new InvalidOperationException("Claim status is required.");
+        await EnsureClaimExists(claimId, cancellationToken);
+        await _claimRepository.UpdateStatusAsync(claimId, claimStatus.Trim(), changedByUserId, cancellationToken);
+    }
+
+    public async Task UpdateWorkflowStepAsync(Guid claimId, string workflowStep, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(workflowStep)) throw new InvalidOperationException("Workflow step is required.");
+        await EnsureClaimExists(claimId, cancellationToken);
+        await _claimRepository.UpdateWorkflowStepAsync(claimId, workflowStep.Trim(), changedByUserId, cancellationToken);
+    }
+
+    private async Task EnsureClaimExists(Guid claimId, CancellationToken cancellationToken)
+    {
+        _ = await _claimRepository.GetClaimByIdAsync(claimId, cancellationToken)
+            ?? throw new InvalidOperationException("Claim not found.");
     }
 
     private static void ValidateClaimRequest(CreateClaimRequestDto request)

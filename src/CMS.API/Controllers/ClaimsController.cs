@@ -1,4 +1,5 @@
-﻿using CMS.API.Middlewares;
+﻿using System.Security.Claims;
+using CMS.API.Middlewares;
 using CMS.Application.DTOs;
 using CMS.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -31,6 +32,14 @@ public sealed class ClaimsController : ControllerBase
     public async Task<IActionResult> GetClaims(CancellationToken cancellationToken)
     {
         var claims = await _claimService.GetClaimsAsync(cancellationToken);
+        return Ok(claims);
+    }
+
+    [HttpGet("assigned")]
+    [RequirePermission("Claims.Assigned.Read")]
+    public async Task<IActionResult> GetAssignedClaims([FromQuery] Guid assigneeUserId, [FromQuery] string role, CancellationToken cancellationToken)
+    {
+        var claims = await _claimService.GetAssignedClaimsAsync(assigneeUserId, role, cancellationToken);
         return Ok(claims);
     }
 
@@ -70,5 +79,51 @@ public sealed class ClaimsController : ControllerBase
     {
         await _claimService.LinkRelatedClaimAsync(claimId, relatedClaimId, cancellationToken);
         return NoContent();
+    }
+
+    [HttpPut("{claimId:guid}/assign/investigator")]
+    [RequirePermission("Claims.AssignInvestigator")]
+    public async Task<IActionResult> AssignInvestigator(Guid claimId, [FromBody] AssignInvestigatorRequestDto request, CancellationToken cancellationToken)
+    {
+        await _claimService.AssignInvestigatorAsync(claimId, request.InvestigatorUserId, GetCurrentUserId(), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPut("{claimId:guid}/assign/adjuster")]
+    [RequirePermission("Claims.AssignAdjuster")]
+    public async Task<IActionResult> AssignAdjuster(Guid claimId, [FromBody] AssignAdjusterRequestDto request, CancellationToken cancellationToken)
+    {
+        await _claimService.AssignAdjusterAsync(claimId, request.AdjusterUserId, GetCurrentUserId(), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPut("{claimId:guid}/priority")]
+    [RequirePermission("Claims.SetPriority")]
+    public async Task<IActionResult> SetPriority(Guid claimId, [FromBody] SetClaimPriorityRequestDto request, CancellationToken cancellationToken)
+    {
+        await _claimService.SetPriorityAsync(claimId, request.Priority, GetCurrentUserId(), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPut("{claimId:guid}/status")]
+    [RequirePermission("Claims.UpdateStatus")]
+    public async Task<IActionResult> UpdateStatus(Guid claimId, [FromBody] UpdateClaimStatusRequestDto request, CancellationToken cancellationToken)
+    {
+        await _claimService.UpdateStatusAsync(claimId, request.ClaimStatus, GetCurrentUserId(), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPut("{claimId:guid}/workflow-step")]
+    [RequirePermission("Claims.UpdateWorkflow")]
+    public async Task<IActionResult> UpdateWorkflowStep(Guid claimId, [FromBody] UpdateWorkflowStepRequestDto request, CancellationToken cancellationToken)
+    {
+        await _claimService.UpdateWorkflowStepAsync(claimId, request.WorkflowStep, GetCurrentUserId(), cancellationToken);
+        return NoContent();
+    }
+
+    private Guid? GetCurrentUserId()
+    {
+        var value = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(value, out var parsed) ? parsed : null;
     }
 }

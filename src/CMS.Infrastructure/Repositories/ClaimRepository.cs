@@ -79,6 +79,25 @@ public sealed class ClaimRepository : IClaimRepository
         return claims;
     }
 
+    public async Task<IReadOnlyList<ClaimSummaryDto>> GetAssignedClaimsAsync(Guid assigneeUserId, string role, CancellationToken cancellationToken)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand("sp_Claims_GetAssignedClaims", connection) { CommandType = CommandType.StoredProcedure };
+        command.Parameters.AddWithValue("@AssigneeUserId", assigneeUserId);
+        command.Parameters.AddWithValue("@Role", role);
+
+        await connection.OpenAsync(cancellationToken);
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        var claims = new List<ClaimSummaryDto>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            claims.Add(MapSummary(reader));
+        }
+
+        return claims;
+    }
+
     public async Task<ClaimDetailDto?> GetClaimByIdAsync(Guid claimId, CancellationToken cancellationToken)
     {
         using var connection = _connectionFactory.CreateConnection();
@@ -100,6 +119,10 @@ public sealed class ClaimRepository : IClaimRepository
             PolicyNumber = reader.GetString(reader.GetOrdinal("PolicyNumber")),
             ClaimType = reader.GetString(reader.GetOrdinal("ClaimType")),
             ClaimStatus = reader.GetString(reader.GetOrdinal("ClaimStatus")),
+            Priority = reader.GetInt32(reader.GetOrdinal("Priority")),
+            WorkflowStep = reader.GetString(reader.GetOrdinal("WorkflowStep")),
+            InvestigatorUserId = reader.IsDBNull(reader.GetOrdinal("InvestigatorUserId")) ? null : reader.GetGuid(reader.GetOrdinal("InvestigatorUserId")),
+            AdjusterUserId = reader.IsDBNull(reader.GetOrdinal("AdjusterUserId")) ? null : reader.GetGuid(reader.GetOrdinal("AdjusterUserId")),
             ReporterName = reader.GetString(reader.GetOrdinal("ReporterName")),
             IncidentDateUtc = reader.GetDateTime(reader.GetOrdinal("IncidentDateUtc")),
             IncidentLocation = reader.GetString(reader.GetOrdinal("IncidentLocation")),
@@ -157,6 +180,33 @@ public sealed class ClaimRepository : IClaimRepository
         return claims;
     }
 
+    public async Task<IReadOnlyList<ClaimWorkflowHistoryDto>> GetWorkflowHistoryAsync(Guid claimId, CancellationToken cancellationToken)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand("sp_Claims_GetWorkflowHistory", connection) { CommandType = CommandType.StoredProcedure };
+        command.Parameters.AddWithValue("@ClaimId", claimId);
+
+        await connection.OpenAsync(cancellationToken);
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        var history = new List<ClaimWorkflowHistoryDto>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            history.Add(new ClaimWorkflowHistoryDto
+            {
+                ClaimWorkflowHistoryId = reader.GetGuid(reader.GetOrdinal("ClaimWorkflowHistoryId")),
+                ClaimId = reader.GetGuid(reader.GetOrdinal("ClaimId")),
+                ActionType = reader.GetString(reader.GetOrdinal("ActionType")),
+                PreviousValue = reader.IsDBNull(reader.GetOrdinal("PreviousValue")) ? null : reader.GetString(reader.GetOrdinal("PreviousValue")),
+                NewValue = reader.GetString(reader.GetOrdinal("NewValue")),
+                ChangedByUserId = reader.IsDBNull(reader.GetOrdinal("ChangedByUserId")) ? null : reader.GetGuid(reader.GetOrdinal("ChangedByUserId")),
+                ChangedAtUtc = reader.GetDateTime(reader.GetOrdinal("ChangedAtUtc"))
+            });
+        }
+
+        return history;
+    }
+
     public async Task<ClaimDocumentDto> AddClaimDocumentAsync(Guid claimId, string originalFileName, string storedFilePath, string contentType, long fileSizeBytes, CancellationToken cancellationToken)
     {
         using var connection = _connectionFactory.CreateConnection();
@@ -199,6 +249,60 @@ public sealed class ClaimRepository : IClaimRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task AssignInvestigatorAsync(Guid claimId, Guid investigatorUserId, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        await ExecuteClaimUpdateAsync("sp_Claims_AssignInvestigator", claimId, investigatorUserId, changedByUserId, cancellationToken, "@InvestigatorUserId");
+    }
+
+    public async Task AssignAdjusterAsync(Guid claimId, Guid adjusterUserId, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        await ExecuteClaimUpdateAsync("sp_Claims_AssignAdjuster", claimId, adjusterUserId, changedByUserId, cancellationToken, "@AdjusterUserId");
+    }
+
+    public async Task SetPriorityAsync(Guid claimId, int priority, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand("sp_Claims_SetPriority", connection) { CommandType = CommandType.StoredProcedure };
+        command.Parameters.AddWithValue("@ClaimId", claimId);
+        command.Parameters.AddWithValue("@Priority", priority);
+        command.Parameters.AddWithValue("@ChangedByUserId", (object?)changedByUserId ?? DBNull.Value);
+        await connection.OpenAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task UpdateStatusAsync(Guid claimId, string claimStatus, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand("sp_Claims_UpdateStatus", connection) { CommandType = CommandType.StoredProcedure };
+        command.Parameters.AddWithValue("@ClaimId", claimId);
+        command.Parameters.AddWithValue("@ClaimStatus", claimStatus);
+        command.Parameters.AddWithValue("@ChangedByUserId", (object?)changedByUserId ?? DBNull.Value);
+        await connection.OpenAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task UpdateWorkflowStepAsync(Guid claimId, string workflowStep, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand("sp_Claims_UpdateWorkflowStep", connection) { CommandType = CommandType.StoredProcedure };
+        command.Parameters.AddWithValue("@ClaimId", claimId);
+        command.Parameters.AddWithValue("@WorkflowStep", workflowStep);
+        command.Parameters.AddWithValue("@ChangedByUserId", (object?)changedByUserId ?? DBNull.Value);
+        await connection.OpenAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private async Task ExecuteClaimUpdateAsync(string procedureName, Guid claimId, Guid assigneeUserId, Guid? changedByUserId, CancellationToken cancellationToken, string parameterName)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand(procedureName, connection) { CommandType = CommandType.StoredProcedure };
+        command.Parameters.AddWithValue("@ClaimId", claimId);
+        command.Parameters.AddWithValue(parameterName, assigneeUserId);
+        command.Parameters.AddWithValue("@ChangedByUserId", (object?)changedByUserId ?? DBNull.Value);
+        await connection.OpenAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static ClaimSummaryDto MapSummary(SqlDataReader reader)
     {
         return new ClaimSummaryDto
@@ -208,6 +312,10 @@ public sealed class ClaimRepository : IClaimRepository
             PolicyNumber = reader.GetString(reader.GetOrdinal("PolicyNumber")),
             ClaimType = reader.GetString(reader.GetOrdinal("ClaimType")),
             ClaimStatus = reader.GetString(reader.GetOrdinal("ClaimStatus")),
+            Priority = reader.GetInt32(reader.GetOrdinal("Priority")),
+            WorkflowStep = reader.GetString(reader.GetOrdinal("WorkflowStep")),
+            InvestigatorUserId = reader.IsDBNull(reader.GetOrdinal("InvestigatorUserId")) ? null : reader.GetGuid(reader.GetOrdinal("InvestigatorUserId")),
+            AdjusterUserId = reader.IsDBNull(reader.GetOrdinal("AdjusterUserId")) ? null : reader.GetGuid(reader.GetOrdinal("AdjusterUserId")),
             ReporterName = reader.GetString(reader.GetOrdinal("ReporterName")),
             IncidentDateUtc = reader.GetDateTime(reader.GetOrdinal("IncidentDateUtc")),
             CreatedAtUtc = reader.GetDateTime(reader.GetOrdinal("CreatedAtUtc"))
