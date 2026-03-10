@@ -1,0 +1,66 @@
+﻿IF OBJECT_ID('dbo.RefreshTokens', 'U') IS NOT NULL DROP TABLE dbo.RefreshTokens;
+IF OBJECT_ID('dbo.UserRoles', 'U') IS NOT NULL DROP TABLE dbo.UserRoles;
+IF OBJECT_ID('dbo.RolePermissions', 'U') IS NOT NULL DROP TABLE dbo.RolePermissions;
+IF OBJECT_ID('dbo.Users', 'U') IS NOT NULL DROP TABLE dbo.Users;
+IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL DROP TABLE dbo.Roles;
+IF OBJECT_ID('dbo.Permissions', 'U') IS NOT NULL DROP TABLE dbo.Permissions;
+
+CREATE TABLE dbo.Users
+(
+    UserId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+    Email NVARCHAR(320) NOT NULL UNIQUE,
+    FullName NVARCHAR(200) NOT NULL,
+    PasswordHash NVARCHAR(500) NOT NULL,
+    PasswordSalt NVARCHAR(500) NOT NULL,
+    IsActive BIT NOT NULL DEFAULT(1),
+    CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE dbo.Roles
+(
+    RoleId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+    Name NVARCHAR(100) NOT NULL UNIQUE,
+    CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE dbo.Permissions
+(
+    PermissionId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+    Name NVARCHAR(150) NOT NULL UNIQUE,
+    CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE dbo.RolePermissions
+(
+    RolePermissionId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+    RoleId UNIQUEIDENTIFIER NOT NULL,
+    PermissionId UNIQUEIDENTIFIER NOT NULL,
+    CONSTRAINT FK_RolePermissions_Roles FOREIGN KEY (RoleId) REFERENCES dbo.Roles(RoleId),
+    CONSTRAINT FK_RolePermissions_Permissions FOREIGN KEY (PermissionId) REFERENCES dbo.Permissions(PermissionId),
+    CONSTRAINT UQ_RolePermissions UNIQUE (RoleId, PermissionId)
+);
+
+CREATE TABLE dbo.UserRoles
+(
+    UserRoleId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+    UserId UNIQUEIDENTIFIER NOT NULL,
+    RoleId UNIQUEIDENTIFIER NOT NULL,
+    CONSTRAINT FK_UserRoles_Users FOREIGN KEY (UserId) REFERENCES dbo.Users(UserId),
+    CONSTRAINT FK_UserRoles_Roles FOREIGN KEY (RoleId) REFERENCES dbo.Roles(RoleId),
+    CONSTRAINT UQ_UserRoles UNIQUE (UserId, RoleId)
+);
+
+CREATE TABLE dbo.RefreshTokens
+(
+    RefreshTokenId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+    UserId UNIQUEIDENTIFIER NOT NULL,
+    TokenHash NVARCHAR(128) NOT NULL UNIQUE,
+    ExpiresAtUtc DATETIME2 NOT NULL,
+    RevokedAtUtc DATETIME2 NULL,
+    RevokedReason NVARCHAR(500) NULL,
+    CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_RefreshTokens_Users FOREIGN KEY (UserId) REFERENCES dbo.Users(UserId)
+);
+
+CREATE INDEX IX_RefreshTokens_UserId ON dbo.RefreshTokens(UserId);
+
