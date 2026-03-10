@@ -19,7 +19,9 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+builder.Services.AddScoped<IConfigurationRepository, ConfigurationRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IConfigurationService, ConfigurationService>();
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 
