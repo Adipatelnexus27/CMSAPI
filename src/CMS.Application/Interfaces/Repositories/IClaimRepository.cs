@@ -1,4 +1,4 @@
-﻿using CMS.Application.DTOs;
+using CMS.Application.DTOs;
 
 namespace CMS.Application.Interfaces.Repositories;
 
@@ -11,9 +11,25 @@ public interface IClaimRepository
     Task<IReadOnlyList<ClaimSummaryDto>> GetAssignedClaimsAsync(Guid assigneeUserId, string role, CancellationToken cancellationToken);
     Task<ClaimDetailDto?> GetClaimByIdAsync(Guid claimId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ClaimDocumentDto>> GetClaimDocumentsAsync(Guid claimId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ClaimDocumentDto>> GetInvestigationDocumentsAsync(Guid claimId, CancellationToken cancellationToken);
     Task<IReadOnlyList<RelatedClaimDto>> GetRelatedClaimsAsync(Guid claimId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ClaimWorkflowHistoryDto>> GetWorkflowHistoryAsync(Guid claimId, CancellationToken cancellationToken);
-    Task<ClaimDocumentDto> AddClaimDocumentAsync(Guid claimId, string originalFileName, string storedFilePath, string contentType, long fileSizeBytes, CancellationToken cancellationToken);
+    Task<IReadOnlyList<InvestigationNoteDto>> GetInvestigationNotesAsync(Guid claimId, CancellationToken cancellationToken);
+    Task<ClaimDocumentDto> AddClaimDocumentAsync(
+        Guid claimId,
+        string originalFileName,
+        string storedFilePath,
+        string contentType,
+        long fileSizeBytes,
+        string documentCategory,
+        CancellationToken cancellationToken);
+    Task<InvestigationNoteDto> AddInvestigatorNoteAsync(
+        Guid claimId,
+        string noteText,
+        int? progressPercentSnapshot,
+        Guid? createdByUserId,
+        CancellationToken cancellationToken);
+    Task UpdateInvestigationProgressAsync(Guid claimId, int progressPercent, Guid? changedByUserId, CancellationToken cancellationToken);
     Task LinkRelatedClaimAsync(Guid claimId, Guid relatedClaimId, CancellationToken cancellationToken);
     Task AssignInvestigatorAsync(Guid claimId, Guid investigatorUserId, Guid? changedByUserId, CancellationToken cancellationToken);
     Task AssignAdjusterAsync(Guid claimId, Guid adjusterUserId, Guid? changedByUserId, CancellationToken cancellationToken);

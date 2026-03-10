@@ -1,4 +1,4 @@
-﻿namespace CMS.Application.DTOs;
+namespace CMS.Application.DTOs;
 
 public sealed class ClaimDetailDto
 {
@@ -16,6 +16,8 @@ public sealed class ClaimDetailDto
     public string IncidentLocation { get; set; } = string.Empty;
     public string IncidentDescription { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; }
+    public int InvestigationProgress { get; set; }
+    public IReadOnlyList<InvestigationNoteDto> InvestigationNotes { get; set; } = [];
     public IReadOnlyList<ClaimDocumentDto> Documents { get; set; } = [];
     public IReadOnlyList<RelatedClaimDto> RelatedClaims { get; set; } = [];
     public IReadOnlyList<ClaimWorkflowHistoryDto> WorkflowHistory { get; set; } = [];

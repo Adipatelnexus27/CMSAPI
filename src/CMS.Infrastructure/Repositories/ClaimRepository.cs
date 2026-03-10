@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using CMS.Application.DTOs;
 using CMS.Application.Interfaces.Repositories;
 using CMS.Infrastructure.Data;
@@ -127,34 +127,19 @@ public sealed class ClaimRepository : IClaimRepository
             IncidentDateUtc = reader.GetDateTime(reader.GetOrdinal("IncidentDateUtc")),
             IncidentLocation = reader.GetString(reader.GetOrdinal("IncidentLocation")),
             IncidentDescription = reader.GetString(reader.GetOrdinal("IncidentDescription")),
-            CreatedAtUtc = reader.GetDateTime(reader.GetOrdinal("CreatedAtUtc"))
+            CreatedAtUtc = reader.GetDateTime(reader.GetOrdinal("CreatedAtUtc")),
+            InvestigationProgress = reader.GetInt32(reader.GetOrdinal("InvestigationProgress"))
         };
     }
 
     public async Task<IReadOnlyList<ClaimDocumentDto>> GetClaimDocumentsAsync(Guid claimId, CancellationToken cancellationToken)
     {
-        using var connection = _connectionFactory.CreateConnection();
-        using var command = new SqlCommand("sp_Claims_GetDocuments", connection) { CommandType = CommandType.StoredProcedure };
-        command.Parameters.AddWithValue("@ClaimId", claimId);
+        return await GetDocumentsByProcedureAsync("sp_Claims_GetDocuments", claimId, cancellationToken);
+    }
 
-        await connection.OpenAsync(cancellationToken);
-        using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-        var documents = new List<ClaimDocumentDto>();
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            documents.Add(new ClaimDocumentDto
-            {
-                ClaimDocumentId = reader.GetGuid(reader.GetOrdinal("ClaimDocumentId")),
-                ClaimId = reader.GetGuid(reader.GetOrdinal("ClaimId")),
-                OriginalFileName = reader.GetString(reader.GetOrdinal("OriginalFileName")),
-                ContentType = reader.GetString(reader.GetOrdinal("ContentType")),
-                FileSizeBytes = reader.GetInt64(reader.GetOrdinal("FileSizeBytes")),
-                UploadedAtUtc = reader.GetDateTime(reader.GetOrdinal("UploadedAtUtc"))
-            });
-        }
-
-        return documents;
+    public async Task<IReadOnlyList<ClaimDocumentDto>> GetInvestigationDocumentsAsync(Guid claimId, CancellationToken cancellationToken)
+    {
+        return await GetDocumentsByProcedureAsync("sp_Claims_GetInvestigationDocuments", claimId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<RelatedClaimDto>> GetRelatedClaimsAsync(Guid claimId, CancellationToken cancellationToken)
@@ -207,7 +192,40 @@ public sealed class ClaimRepository : IClaimRepository
         return history;
     }
 
-    public async Task<ClaimDocumentDto> AddClaimDocumentAsync(Guid claimId, string originalFileName, string storedFilePath, string contentType, long fileSizeBytes, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<InvestigationNoteDto>> GetInvestigationNotesAsync(Guid claimId, CancellationToken cancellationToken)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand("sp_Claims_GetInvestigationNotes", connection) { CommandType = CommandType.StoredProcedure };
+        command.Parameters.AddWithValue("@ClaimId", claimId);
+
+        await connection.OpenAsync(cancellationToken);
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        var notes = new List<InvestigationNoteDto>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            notes.Add(new InvestigationNoteDto
+            {
+                ClaimInvestigationNoteId = reader.GetGuid(reader.GetOrdinal("ClaimInvestigationNoteId")),
+                ClaimId = reader.GetGuid(reader.GetOrdinal("ClaimId")),
+                NoteText = reader.GetString(reader.GetOrdinal("NoteText")),
+                ProgressPercentSnapshot = reader.IsDBNull(reader.GetOrdinal("ProgressPercentSnapshot")) ? null : reader.GetInt32(reader.GetOrdinal("ProgressPercentSnapshot")),
+                CreatedByUserId = reader.IsDBNull(reader.GetOrdinal("CreatedByUserId")) ? null : reader.GetGuid(reader.GetOrdinal("CreatedByUserId")),
+                CreatedAtUtc = reader.GetDateTime(reader.GetOrdinal("CreatedAtUtc"))
+            });
+        }
+
+        return notes;
+    }
+
+    public async Task<ClaimDocumentDto> AddClaimDocumentAsync(
+        Guid claimId,
+        string originalFileName,
+        string storedFilePath,
+        string contentType,
+        long fileSizeBytes,
+        string documentCategory,
+        CancellationToken cancellationToken)
     {
         using var connection = _connectionFactory.CreateConnection();
         using var command = new SqlCommand("sp_Claims_AddDocument", connection) { CommandType = CommandType.StoredProcedure };
@@ -218,6 +236,7 @@ public sealed class ClaimRepository : IClaimRepository
         command.Parameters.AddWithValue("@StoredFilePath", storedFilePath);
         command.Parameters.AddWithValue("@ContentType", contentType);
         command.Parameters.AddWithValue("@FileSizeBytes", fileSizeBytes);
+        command.Parameters.AddWithValue("@DocumentCategory", documentCategory);
 
         await connection.OpenAsync(cancellationToken);
         using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -227,15 +246,54 @@ public sealed class ClaimRepository : IClaimRepository
             throw new InvalidOperationException("Document record could not be created.");
         }
 
-        return new ClaimDocumentDto
+        return MapDocument(reader);
+    }
+
+    public async Task<InvestigationNoteDto> AddInvestigatorNoteAsync(
+        Guid claimId,
+        string noteText,
+        int? progressPercentSnapshot,
+        Guid? createdByUserId,
+        CancellationToken cancellationToken)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand("sp_Claims_AddInvestigatorNote", connection) { CommandType = CommandType.StoredProcedure };
+
+        command.Parameters.AddWithValue("@ClaimInvestigationNoteId", Guid.NewGuid());
+        command.Parameters.AddWithValue("@ClaimId", claimId);
+        command.Parameters.AddWithValue("@NoteText", noteText);
+        command.Parameters.AddWithValue("@ProgressPercentSnapshot", (object?)progressPercentSnapshot ?? DBNull.Value);
+        command.Parameters.AddWithValue("@CreatedByUserId", (object?)createdByUserId ?? DBNull.Value);
+
+        await connection.OpenAsync(cancellationToken);
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        if (!await reader.ReadAsync(cancellationToken))
         {
-            ClaimDocumentId = reader.GetGuid(reader.GetOrdinal("ClaimDocumentId")),
+            throw new InvalidOperationException("Investigation note could not be created.");
+        }
+
+        return new InvestigationNoteDto
+        {
+            ClaimInvestigationNoteId = reader.GetGuid(reader.GetOrdinal("ClaimInvestigationNoteId")),
             ClaimId = reader.GetGuid(reader.GetOrdinal("ClaimId")),
-            OriginalFileName = reader.GetString(reader.GetOrdinal("OriginalFileName")),
-            ContentType = reader.GetString(reader.GetOrdinal("ContentType")),
-            FileSizeBytes = reader.GetInt64(reader.GetOrdinal("FileSizeBytes")),
-            UploadedAtUtc = reader.GetDateTime(reader.GetOrdinal("UploadedAtUtc"))
+            NoteText = reader.GetString(reader.GetOrdinal("NoteText")),
+            ProgressPercentSnapshot = reader.IsDBNull(reader.GetOrdinal("ProgressPercentSnapshot")) ? null : reader.GetInt32(reader.GetOrdinal("ProgressPercentSnapshot")),
+            CreatedByUserId = reader.IsDBNull(reader.GetOrdinal("CreatedByUserId")) ? null : reader.GetGuid(reader.GetOrdinal("CreatedByUserId")),
+            CreatedAtUtc = reader.GetDateTime(reader.GetOrdinal("CreatedAtUtc"))
         };
+    }
+
+    public async Task UpdateInvestigationProgressAsync(Guid claimId, int progressPercent, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand("sp_Claims_UpdateInvestigationProgress", connection) { CommandType = CommandType.StoredProcedure };
+        command.Parameters.AddWithValue("@ClaimId", claimId);
+        command.Parameters.AddWithValue("@ProgressPercent", progressPercent);
+        command.Parameters.AddWithValue("@ChangedByUserId", (object?)changedByUserId ?? DBNull.Value);
+
+        await connection.OpenAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task LinkRelatedClaimAsync(Guid claimId, Guid relatedClaimId, CancellationToken cancellationToken)
@@ -303,6 +361,38 @@ public sealed class ClaimRepository : IClaimRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    private async Task<IReadOnlyList<ClaimDocumentDto>> GetDocumentsByProcedureAsync(string procedureName, Guid claimId, CancellationToken cancellationToken)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand(procedureName, connection) { CommandType = CommandType.StoredProcedure };
+        command.Parameters.AddWithValue("@ClaimId", claimId);
+
+        await connection.OpenAsync(cancellationToken);
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        var documents = new List<ClaimDocumentDto>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            documents.Add(MapDocument(reader));
+        }
+
+        return documents;
+    }
+
+    private static ClaimDocumentDto MapDocument(SqlDataReader reader)
+    {
+        return new ClaimDocumentDto
+        {
+            ClaimDocumentId = reader.GetGuid(reader.GetOrdinal("ClaimDocumentId")),
+            ClaimId = reader.GetGuid(reader.GetOrdinal("ClaimId")),
+            OriginalFileName = reader.GetString(reader.GetOrdinal("OriginalFileName")),
+            DocumentCategory = reader.IsDBNull(reader.GetOrdinal("DocumentCategory")) ? "General" : reader.GetString(reader.GetOrdinal("DocumentCategory")),
+            ContentType = reader.GetString(reader.GetOrdinal("ContentType")),
+            FileSizeBytes = reader.GetInt64(reader.GetOrdinal("FileSizeBytes")),
+            UploadedAtUtc = reader.GetDateTime(reader.GetOrdinal("UploadedAtUtc"))
+        };
+    }
+
     private static ClaimSummaryDto MapSummary(SqlDataReader reader)
     {
         return new ClaimSummaryDto
@@ -318,7 +408,8 @@ public sealed class ClaimRepository : IClaimRepository
             AdjusterUserId = reader.IsDBNull(reader.GetOrdinal("AdjusterUserId")) ? null : reader.GetGuid(reader.GetOrdinal("AdjusterUserId")),
             ReporterName = reader.GetString(reader.GetOrdinal("ReporterName")),
             IncidentDateUtc = reader.GetDateTime(reader.GetOrdinal("IncidentDateUtc")),
-            CreatedAtUtc = reader.GetDateTime(reader.GetOrdinal("CreatedAtUtc"))
+            CreatedAtUtc = reader.GetDateTime(reader.GetOrdinal("CreatedAtUtc")),
+            InvestigationProgress = reader.GetInt32(reader.GetOrdinal("InvestigationProgress"))
         };
     }
 }

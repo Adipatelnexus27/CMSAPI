@@ -1,4 +1,4 @@
-﻿using CMS.Application.DTOs;
+using CMS.Application.DTOs;
 using CMS.Application.Interfaces.Repositories;
 using CMS.Application.Interfaces.Services;
 
@@ -6,13 +6,21 @@ namespace CMS.Application.Services;
 
 public sealed class ClaimService : IClaimService
 {
-    private readonly IClaimRepository _claimRepository;
-    private readonly string _storageRoot;
+    private static readonly HashSet<string> InvestigationDocumentCategories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Evidence",
+        "AccidentPhoto",
+        "PoliceReport",
+        "MedicalReport"
+    };
 
-    public ClaimService(IClaimRepository claimRepository)
+    private readonly IClaimRepository _claimRepository;
+    private readonly IDocumentStorageService _documentStorageService;
+
+    public ClaimService(IClaimRepository claimRepository, IDocumentStorageService documentStorageService)
     {
         _claimRepository = claimRepository;
-        _storageRoot = Path.Combine(AppContext.BaseDirectory, "uploads", "claims");
+        _documentStorageService = documentStorageService;
     }
 
     public async Task<ClaimSummaryDto> RegisterClaimAsync(CreateClaimRequestDto request, CancellationToken cancellationToken)
@@ -60,6 +68,11 @@ public sealed class ClaimService : IClaimService
         return await _claimRepository.GetAssignedClaimsAsync(assigneeUserId, role, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ClaimSummaryDto>> GetInvestigationDashboardAsync(CancellationToken cancellationToken)
+    {
+        return await _claimRepository.GetClaimsAsync(cancellationToken);
+    }
+
     public async Task<ClaimDetailDto> GetClaimDetailAsync(Guid claimId, CancellationToken cancellationToken)
     {
         var claim = await _claimRepository.GetClaimByIdAsync(claimId, cancellationToken)
@@ -68,65 +81,81 @@ public sealed class ClaimService : IClaimService
         var documents = await _claimRepository.GetClaimDocumentsAsync(claimId, cancellationToken);
         var related = await _claimRepository.GetRelatedClaimsAsync(claimId, cancellationToken);
         var workflowHistory = await _claimRepository.GetWorkflowHistoryAsync(claimId, cancellationToken);
+        var investigationNotes = await _claimRepository.GetInvestigationNotesAsync(claimId, cancellationToken);
 
         claim.Documents = documents;
         claim.RelatedClaims = related;
         claim.WorkflowHistory = workflowHistory;
+        claim.InvestigationNotes = investigationNotes;
 
         return claim;
     }
 
+    public async Task<ClaimInvestigationDto> GetClaimInvestigationAsync(Guid claimId, CancellationToken cancellationToken)
+    {
+        var claim = await _claimRepository.GetClaimByIdAsync(claimId, cancellationToken)
+            ?? throw new InvalidOperationException("Claim not found.");
+
+        var documents = await _claimRepository.GetInvestigationDocumentsAsync(claimId, cancellationToken);
+        var notes = await _claimRepository.GetInvestigationNotesAsync(claimId, cancellationToken);
+
+        return new ClaimInvestigationDto
+        {
+            ClaimId = claim.ClaimId,
+            ClaimNumber = claim.ClaimNumber,
+            ClaimStatus = claim.ClaimStatus,
+            InvestigationProgress = claim.InvestigationProgress,
+            Documents = documents,
+            Notes = notes
+        };
+    }
+
     public async Task<UploadClaimDocumentResponseDto> UploadDocumentAsync(Guid claimId, string originalFileName, string contentType, long fileSizeBytes, Stream contentStream, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(originalFileName))
+        return await UploadDocumentInternalAsync(claimId, "General", originalFileName, contentType, fileSizeBytes, contentStream, cancellationToken);
+    }
+
+    public async Task<UploadClaimDocumentResponseDto> UploadInvestigationDocumentAsync(Guid claimId, string documentCategory, string originalFileName, string contentType, long fileSizeBytes, Stream contentStream, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(documentCategory) || !InvestigationDocumentCategories.Contains(documentCategory.Trim()))
         {
-            throw new InvalidOperationException("Document name is required.");
+            throw new InvalidOperationException("Document category must be one of: Evidence, AccidentPhoto, PoliceReport, MedicalReport.");
         }
 
-        if (fileSizeBytes <= 0)
+        return await UploadDocumentInternalAsync(claimId, documentCategory.Trim(), originalFileName, contentType, fileSizeBytes, contentStream, cancellationToken);
+    }
+
+    public async Task<InvestigationNoteDto> AddInvestigatorNoteAsync(Guid claimId, string noteText, int? progressPercentSnapshot, Guid? createdByUserId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(noteText))
         {
-            throw new InvalidOperationException("Document is empty.");
+            throw new InvalidOperationException("Investigator note is required.");
         }
 
-        if (fileSizeBytes > 25 * 1024 * 1024)
+        if (progressPercentSnapshot.HasValue && (progressPercentSnapshot.Value < 0 || progressPercentSnapshot.Value > 100))
         {
-            throw new InvalidOperationException("Document exceeds 25 MB limit.");
+            throw new InvalidOperationException("Investigation progress must be between 0 and 100.");
         }
 
-        var claim = await _claimRepository.GetClaimByIdAsync(claimId, cancellationToken);
-        if (claim is null)
-        {
-            throw new InvalidOperationException("Claim not found.");
-        }
+        await EnsureClaimExists(claimId, cancellationToken);
 
-        Directory.CreateDirectory(_storageRoot);
-
-        var safeFileName = SanitizeFileName(originalFileName);
-        var extension = Path.GetExtension(safeFileName);
-        var generatedName = $"{claim.ClaimNumber}_{Guid.NewGuid():N}{extension}";
-        var fullPath = Path.Combine(_storageRoot, generatedName);
-
-        await using (var fileStream = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-        {
-            await contentStream.CopyToAsync(fileStream, cancellationToken);
-        }
-
-        var document = await _claimRepository.AddClaimDocumentAsync(
+        return await _claimRepository.AddInvestigatorNoteAsync(
             claimId,
-            originalFileName,
-            fullPath,
-            contentType,
-            fileSizeBytes,
+            noteText.Trim(),
+            progressPercentSnapshot,
+            createdByUserId,
             cancellationToken);
+    }
 
-        return new UploadClaimDocumentResponseDto
+    public async Task UpdateInvestigationProgressAsync(Guid claimId, int progressPercent, Guid? changedByUserId, CancellationToken cancellationToken)
+    {
+        if (progressPercent < 0 || progressPercent > 100)
         {
-            ClaimDocumentId = document.ClaimDocumentId,
-            OriginalFileName = document.OriginalFileName,
-            ContentType = document.ContentType,
-            FileSizeBytes = document.FileSizeBytes,
-            UploadedAtUtc = document.UploadedAtUtc
-        };
+            throw new InvalidOperationException("Investigation progress must be between 0 and 100.");
+        }
+
+        await EnsureClaimExists(claimId, cancellationToken);
+        await _claimRepository.UpdateInvestigationProgressAsync(claimId, progressPercent, changedByUserId, cancellationToken);
     }
 
     public async Task LinkRelatedClaimAsync(Guid claimId, Guid relatedClaimId, CancellationToken cancellationToken)
@@ -180,6 +209,45 @@ public sealed class ClaimService : IClaimService
         await _claimRepository.UpdateWorkflowStepAsync(claimId, workflowStep.Trim(), changedByUserId, cancellationToken);
     }
 
+    private async Task<UploadClaimDocumentResponseDto> UploadDocumentInternalAsync(
+        Guid claimId,
+        string documentCategory,
+        string originalFileName,
+        string contentType,
+        long fileSizeBytes,
+        Stream contentStream,
+        CancellationToken cancellationToken)
+    {
+        ValidateDocumentUpload(originalFileName, fileSizeBytes);
+
+        var claim = await _claimRepository.GetClaimByIdAsync(claimId, cancellationToken);
+        if (claim is null)
+        {
+            throw new InvalidOperationException("Claim not found.");
+        }
+
+        var fullPath = await _documentStorageService.SaveAsync(claim.ClaimNumber, originalFileName, contentStream, cancellationToken);
+
+        var document = await _claimRepository.AddClaimDocumentAsync(
+            claimId,
+            originalFileName,
+            fullPath,
+            contentType,
+            fileSizeBytes,
+            documentCategory,
+            cancellationToken);
+
+        return new UploadClaimDocumentResponseDto
+        {
+            ClaimDocumentId = document.ClaimDocumentId,
+            OriginalFileName = document.OriginalFileName,
+            ContentType = document.ContentType,
+            DocumentCategory = document.DocumentCategory,
+            FileSizeBytes = document.FileSizeBytes,
+            UploadedAtUtc = document.UploadedAtUtc
+        };
+    }
+
     private async Task EnsureClaimExists(Guid claimId, CancellationToken cancellationToken)
     {
         _ = await _claimRepository.GetClaimByIdAsync(claimId, cancellationToken)
@@ -197,10 +265,21 @@ public sealed class ClaimService : IClaimService
         if (string.IsNullOrWhiteSpace(request.IncidentDescription)) throw new InvalidOperationException("Incident description is required.");
     }
 
-    private static string SanitizeFileName(string fileName)
+    private static void ValidateDocumentUpload(string originalFileName, long fileSizeBytes)
     {
-        var invalidChars = Path.GetInvalidFileNameChars();
-        var sanitized = new string(fileName.Select(c => invalidChars.Contains(c) ? '_' : c).ToArray());
-        return string.IsNullOrWhiteSpace(sanitized) ? "document.bin" : sanitized;
+        if (string.IsNullOrWhiteSpace(originalFileName))
+        {
+            throw new InvalidOperationException("Document name is required.");
+        }
+
+        if (fileSizeBytes <= 0)
+        {
+            throw new InvalidOperationException("Document is empty.");
+        }
+
+        if (fileSizeBytes > 25 * 1024 * 1024)
+        {
+            throw new InvalidOperationException("Document exceeds 25 MB limit.");
+        }
     }
 }

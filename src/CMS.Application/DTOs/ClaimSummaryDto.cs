@@ -1,4 +1,4 @@
-﻿namespace CMS.Application.DTOs;
+namespace CMS.Application.DTOs;
 
 public sealed class ClaimSummaryDto
 {
@@ -14,4 +14,5 @@ public sealed class ClaimSummaryDto
     public string ReporterName { get; set; } = string.Empty;
     public DateTime IncidentDateUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+    public int InvestigationProgress { get; set; }
 }

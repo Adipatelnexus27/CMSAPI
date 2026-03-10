@@ -5,6 +5,7 @@ using CMS.Application.Interfaces.Services;
 using CMS.Application.Services;
 using CMS.Infrastructure.Configuration;
 using CMS.Infrastructure.Data;
+using CMS.Infrastructure.Documents;
 using CMS.Infrastructure.Repositories;
 using CMS.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -24,6 +25,7 @@ builder.Services.AddScoped<IClaimRepository, ClaimRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IConfigurationService, ConfigurationService>();
 builder.Services.AddScoped<IClaimService, ClaimService>();
+builder.Services.AddScoped<IDocumentStorageService, FileSystemDocumentStorageService>();
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 
