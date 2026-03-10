@@ -27,6 +27,7 @@ builder.Services.AddScoped<IClaimSettlementRepository, ClaimSettlementRepository
 builder.Services.AddScoped<IFraudRepository, FraudRepository>();
 builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
 builder.Services.AddScoped<IReportingRepository, ReportingRepository>();
+builder.Services.AddScoped<IAuditRepository, AuditRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IConfigurationService, ConfigurationService>();
 builder.Services.AddScoped<IClaimService, ClaimService>();
@@ -36,6 +37,7 @@ builder.Services.AddScoped<IFraudService, FraudService>();
 builder.Services.AddScoped<IFraudRuleEngine, FraudRuleEngine>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IDocumentStorageService, FileSystemDocumentStorageService>();
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
@@ -83,6 +85,7 @@ app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseCors("ClientApps");
 app.UseHttpsRedirection();
 app.UseAuthentication();
+app.UseMiddleware<AuditTrailMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<PermissionAuthorizationMiddleware>();
 
