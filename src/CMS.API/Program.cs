@@ -20,10 +20,27 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IConfigurationRepository, ConfigurationRepository>();
+builder.Services.AddScoped<IClaimRepository, ClaimRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IConfigurationService, ConfigurationService>();
+builder.Services.AddScoped<IClaimService, ClaimService>();
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ClientApps", policy =>
+    {
+        policy
+            .WithOrigins(
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:3000",
+                "http://10.0.2.2:5001")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()
     ?? throw new InvalidOperationException("Jwt configuration section is missing.");
@@ -50,6 +67,7 @@ var app = builder.Build();
 
 app.UseMiddleware<ApiExceptionMiddleware>();
 
+app.UseCors("ClientApps");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
