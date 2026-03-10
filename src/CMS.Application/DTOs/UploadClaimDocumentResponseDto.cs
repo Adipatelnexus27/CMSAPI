@@ -8,4 +8,8 @@ public sealed class UploadClaimDocumentResponseDto
     public string DocumentCategory { get; set; } = string.Empty;
     public long FileSizeBytes { get; set; }
     public DateTime UploadedAtUtc { get; set; }
+    public Guid DocumentGroupId { get; set; }
+    public int VersionNumber { get; set; }
+    public bool IsLatest { get; set; }
+    public Guid? UploadedByUserId { get; set; }
 }

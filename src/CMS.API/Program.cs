@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using CMS.API.Middlewares;
 using CMS.Application.Interfaces.Repositories;
 using CMS.Application.Interfaces.Services;
@@ -25,6 +25,7 @@ builder.Services.AddScoped<IClaimRepository, ClaimRepository>();
 builder.Services.AddScoped<IClaimReserveRepository, ClaimReserveRepository>();
 builder.Services.AddScoped<IClaimSettlementRepository, ClaimSettlementRepository>();
 builder.Services.AddScoped<IFraudRepository, FraudRepository>();
+builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IConfigurationService, ConfigurationService>();
 builder.Services.AddScoped<IClaimService, ClaimService>();
@@ -32,6 +33,7 @@ builder.Services.AddScoped<IClaimReserveService, ClaimReserveService>();
 builder.Services.AddScoped<IClaimSettlementService, ClaimSettlementService>();
 builder.Services.AddScoped<IFraudService, FraudService>();
 builder.Services.AddScoped<IFraudRuleEngine, FraudRuleEngine>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IDocumentStorageService, FileSystemDocumentStorageService>();
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
@@ -85,4 +87,3 @@ app.UseMiddleware<PermissionAuthorizationMiddleware>();
 app.MapControllers();
 
 app.Run();
-

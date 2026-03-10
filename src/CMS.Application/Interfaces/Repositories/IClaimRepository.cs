@@ -22,6 +22,8 @@ public interface IClaimRepository
         string contentType,
         long fileSizeBytes,
         string documentCategory,
+        Guid? documentGroupId,
+        Guid? uploadedByUserId,
         CancellationToken cancellationToken);
     Task<InvestigationNoteDto> AddInvestigatorNoteAsync(
         Guid claimId,

@@ -84,6 +84,7 @@ public sealed class ClaimsController : ControllerBase
             file.ContentType,
             file.Length,
             stream,
+            GetCurrentUserId(),
             cancellationToken);
 
         return Ok(result);
@@ -107,6 +108,7 @@ public sealed class ClaimsController : ControllerBase
             file.ContentType,
             file.Length,
             stream,
+            GetCurrentUserId(),
             cancellationToken);
 
         return Ok(result);

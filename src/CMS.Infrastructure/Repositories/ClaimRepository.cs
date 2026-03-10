@@ -225,6 +225,8 @@ public sealed class ClaimRepository : IClaimRepository
         string contentType,
         long fileSizeBytes,
         string documentCategory,
+        Guid? documentGroupId,
+        Guid? uploadedByUserId,
         CancellationToken cancellationToken)
     {
         using var connection = _connectionFactory.CreateConnection();
@@ -237,6 +239,8 @@ public sealed class ClaimRepository : IClaimRepository
         command.Parameters.AddWithValue("@ContentType", contentType);
         command.Parameters.AddWithValue("@FileSizeBytes", fileSizeBytes);
         command.Parameters.AddWithValue("@DocumentCategory", documentCategory);
+        command.Parameters.AddWithValue("@DocumentGroupId", (object?)documentGroupId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@UploadedByUserId", (object?)uploadedByUserId ?? DBNull.Value);
 
         await connection.OpenAsync(cancellationToken);
         using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -389,7 +393,11 @@ public sealed class ClaimRepository : IClaimRepository
             DocumentCategory = reader.IsDBNull(reader.GetOrdinal("DocumentCategory")) ? "General" : reader.GetString(reader.GetOrdinal("DocumentCategory")),
             ContentType = reader.GetString(reader.GetOrdinal("ContentType")),
             FileSizeBytes = reader.GetInt64(reader.GetOrdinal("FileSizeBytes")),
-            UploadedAtUtc = reader.GetDateTime(reader.GetOrdinal("UploadedAtUtc"))
+            UploadedAtUtc = reader.GetDateTime(reader.GetOrdinal("UploadedAtUtc")),
+            DocumentGroupId = reader.IsDBNull(reader.GetOrdinal("DocumentGroupId")) ? reader.GetGuid(reader.GetOrdinal("ClaimDocumentId")) : reader.GetGuid(reader.GetOrdinal("DocumentGroupId")),
+            VersionNumber = reader.IsDBNull(reader.GetOrdinal("VersionNumber")) ? 1 : reader.GetInt32(reader.GetOrdinal("VersionNumber")),
+            IsLatest = reader.IsDBNull(reader.GetOrdinal("IsLatest")) || reader.GetBoolean(reader.GetOrdinal("IsLatest")),
+            UploadedByUserId = reader.IsDBNull(reader.GetOrdinal("UploadedByUserId")) ? null : reader.GetGuid(reader.GetOrdinal("UploadedByUserId"))
         };
     }
 

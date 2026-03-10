@@ -110,19 +110,19 @@ public sealed class ClaimService : IClaimService
         };
     }
 
-    public async Task<UploadClaimDocumentResponseDto> UploadDocumentAsync(Guid claimId, string originalFileName, string contentType, long fileSizeBytes, Stream contentStream, CancellationToken cancellationToken)
+    public async Task<UploadClaimDocumentResponseDto> UploadDocumentAsync(Guid claimId, string originalFileName, string contentType, long fileSizeBytes, Stream contentStream, Guid? uploadedByUserId, CancellationToken cancellationToken)
     {
-        return await UploadDocumentInternalAsync(claimId, "General", originalFileName, contentType, fileSizeBytes, contentStream, cancellationToken);
+        return await UploadDocumentInternalAsync(claimId, "General", originalFileName, contentType, fileSizeBytes, contentStream, null, uploadedByUserId, cancellationToken);
     }
 
-    public async Task<UploadClaimDocumentResponseDto> UploadInvestigationDocumentAsync(Guid claimId, string documentCategory, string originalFileName, string contentType, long fileSizeBytes, Stream contentStream, CancellationToken cancellationToken)
+    public async Task<UploadClaimDocumentResponseDto> UploadInvestigationDocumentAsync(Guid claimId, string documentCategory, string originalFileName, string contentType, long fileSizeBytes, Stream contentStream, Guid? uploadedByUserId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(documentCategory) || !InvestigationDocumentCategories.Contains(documentCategory.Trim()))
         {
             throw new InvalidOperationException("Document category must be one of: Evidence, AccidentPhoto, PoliceReport, MedicalReport.");
         }
 
-        return await UploadDocumentInternalAsync(claimId, documentCategory.Trim(), originalFileName, contentType, fileSizeBytes, contentStream, cancellationToken);
+        return await UploadDocumentInternalAsync(claimId, documentCategory.Trim(), originalFileName, contentType, fileSizeBytes, contentStream, null, uploadedByUserId, cancellationToken);
     }
 
     public async Task<InvestigationNoteDto> AddInvestigatorNoteAsync(Guid claimId, string noteText, int? progressPercentSnapshot, Guid? createdByUserId, CancellationToken cancellationToken)
@@ -216,6 +216,8 @@ public sealed class ClaimService : IClaimService
         string contentType,
         long fileSizeBytes,
         Stream contentStream,
+        Guid? documentGroupId,
+        Guid? uploadedByUserId,
         CancellationToken cancellationToken)
     {
         ValidateDocumentUpload(originalFileName, fileSizeBytes);
@@ -235,6 +237,8 @@ public sealed class ClaimService : IClaimService
             contentType,
             fileSizeBytes,
             documentCategory,
+            documentGroupId,
+            uploadedByUserId,
             cancellationToken);
 
         return new UploadClaimDocumentResponseDto
@@ -244,7 +248,11 @@ public sealed class ClaimService : IClaimService
             ContentType = document.ContentType,
             DocumentCategory = document.DocumentCategory,
             FileSizeBytes = document.FileSizeBytes,
-            UploadedAtUtc = document.UploadedAtUtc
+            UploadedAtUtc = document.UploadedAtUtc,
+            DocumentGroupId = document.DocumentGroupId,
+            VersionNumber = document.VersionNumber,
+            IsLatest = document.IsLatest,
+            UploadedByUserId = document.UploadedByUserId
         };
     }
 

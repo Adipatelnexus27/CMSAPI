@@ -1,6 +1,6 @@
 namespace CMS.Application.DTOs;
 
-public sealed class ClaimDocumentDto
+public sealed class UploadDocumentResponseDto
 {
     public Guid ClaimDocumentId { get; set; }
     public Guid ClaimId { get; set; }
