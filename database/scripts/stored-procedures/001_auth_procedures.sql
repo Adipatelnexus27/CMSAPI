@@ -82,6 +82,31 @@ BEGIN
 END;
 GO
 
+CREATE OR ALTER PROCEDURE dbo.sp_Auth_GetUsers
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        u.UserId,
+        u.Email,
+        u.FullName,
+        u.IsActive,
+        u.CreatedAtUtc,
+        STRING_AGG(r.Name, ',') WITHIN GROUP (ORDER BY r.Name) AS RolesCsv
+    FROM dbo.Users u
+    LEFT JOIN dbo.UserRoles ur ON ur.UserId = u.UserId
+    LEFT JOIN dbo.Roles r ON r.RoleId = ur.RoleId
+    GROUP BY
+        u.UserId,
+        u.Email,
+        u.FullName,
+        u.IsActive,
+        u.CreatedAtUtc
+    ORDER BY u.CreatedAtUtc DESC;
+END;
+GO
+
 CREATE OR ALTER PROCEDURE dbo.sp_Auth_GetUserRoles
     @UserId UNIQUEIDENTIFIER
 AS

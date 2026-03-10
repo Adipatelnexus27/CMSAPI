@@ -8,4 +8,5 @@ public interface IAuthService
     Task<AuthResponseDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken);
     Task<AuthResponseDto> RefreshAsync(RefreshTokenRequestDto request, CancellationToken cancellationToken);
     Task RevokeAsync(RevokeTokenRequestDto request, CancellationToken cancellationToken);
+    Task<IReadOnlyList<UserSummaryDto>> GetUsersAsync(CancellationToken cancellationToken);
 }

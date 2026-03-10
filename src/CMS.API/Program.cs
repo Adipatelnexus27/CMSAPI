@@ -50,8 +50,10 @@ builder.Services.AddCors(options =>
             .WithOrigins(
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
+                "https://localhost:5173",
+                "https://127.0.0.1:5173",
                 "http://localhost:3000",
-                "http://10.0.2.2:5001")
+                "https://localhost:3000")
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -83,7 +85,10 @@ var app = builder.Build();
 app.UseMiddleware<ApiExceptionMiddleware>();
 
 app.UseCors("ClientApps");
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseMiddleware<AuditTrailMiddleware>();
 app.UseAuthorization();

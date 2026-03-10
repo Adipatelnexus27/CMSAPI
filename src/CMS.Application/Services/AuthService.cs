@@ -71,6 +71,22 @@ public sealed class AuthService : IAuthService
         await _authRepository.RevokeRefreshTokenAsync(requestHash, request.Reason, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<UserSummaryDto>> GetUsersAsync(CancellationToken cancellationToken)
+    {
+        var users = await _authRepository.GetUsersAsync(cancellationToken);
+        return users
+            .Select(user => new UserSummaryDto
+            {
+                UserId = user.UserId,
+                Email = user.Email,
+                FullName = user.FullName,
+                Roles = user.Roles,
+                IsActive = user.IsActive,
+                CreatedAtUtc = user.CreatedAtUtc
+            })
+            .ToList();
+    }
+
     private async Task<AuthResponseDto> GenerateAuthResponseAsync(Guid userId, string email, string fullName, CancellationToken cancellationToken)
     {
         var roles = await _authRepository.GetUserRolesAsync(userId, cancellationToken);

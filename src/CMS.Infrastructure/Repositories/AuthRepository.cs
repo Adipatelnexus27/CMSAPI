@@ -37,6 +37,39 @@ public sealed class AuthRepository : IAuthRepository
         return MapUser(reader);
     }
 
+    public async Task<IReadOnlyList<AuthUserListRecord>> GetUsersAsync(CancellationToken cancellationToken)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SqlCommand("sp_Auth_GetUsers", connection) { CommandType = CommandType.StoredProcedure };
+        await connection.OpenAsync(cancellationToken);
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        var results = new List<AuthUserListRecord>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var rolesCsv = reader.IsDBNull(reader.GetOrdinal("RolesCsv"))
+                ? string.Empty
+                : reader.GetString(reader.GetOrdinal("RolesCsv"));
+
+            var roles = rolesCsv
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            results.Add(new AuthUserListRecord
+            {
+                UserId = reader.GetGuid(reader.GetOrdinal("UserId")),
+                Email = reader.GetString(reader.GetOrdinal("Email")),
+                FullName = reader.GetString(reader.GetOrdinal("FullName")),
+                Roles = roles,
+                IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive")),
+                CreatedAtUtc = reader.GetDateTime(reader.GetOrdinal("CreatedAtUtc"))
+            });
+        }
+
+        return results;
+    }
+
     public async Task RegisterUserAsync(Guid userId, string email, string fullName, string passwordHash, string passwordSalt, string role, CancellationToken cancellationToken)
     {
         using var connection = _connectionFactory.CreateConnection();

@@ -6,6 +6,7 @@ public interface IAuthRepository
 {
     Task<AuthUserRecord?> GetUserByEmailAsync(string email, CancellationToken cancellationToken);
     Task<AuthUserRecord?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<AuthUserListRecord>> GetUsersAsync(CancellationToken cancellationToken);
     Task RegisterUserAsync(Guid userId, string email, string fullName, string passwordHash, string passwordSalt, string role, CancellationToken cancellationToken);
     Task<IReadOnlyList<string>> GetUserRolesAsync(Guid userId, CancellationToken cancellationToken);
     Task<IReadOnlyList<string>> GetUserPermissionsAsync(Guid userId, CancellationToken cancellationToken);
